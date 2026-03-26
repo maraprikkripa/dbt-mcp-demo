@@ -1,0 +1,70 @@
+version: 2
+
+models:
+  - name: int_orders_enriched
+    description: >
+      One record per order, enriched with customer name and store (location) details.
+      Bridges staging data for use in gold-layer aggregations. Built from stg_orders,
+      stg_customers, and stg_locations.
+    columns:
+      - name: order_id
+        description: "Primary key — unique identifier for each order."
+        data_tests:
+          - unique
+          - not_null
+      - name: order_date
+        description: "Date the order was placed. stg_orders does not test this column — genuine gap."
+        data_tests:
+          - not_null
+      - name: customer_id
+        description: "Foreign key to stg_customers. Not re-tested — already covered upstream in stg_orders."
+      - name: customer_name
+        description: "Full customer name (denormalized from stg_customers). Not re-tested — already covered upstream in stg_customers."
+      - name: location_id
+        description: "Foreign key to stg_locations. Not re-tested — already covered upstream in stg_orders."
+      - name: location_name
+        description: "Store name where the order was placed. Not re-tested — already covered upstream in stg_locations."
+      - name: tax_rate
+        description: "Tax rate applied at this location. Not re-tested — already covered upstream in stg_locations."
+      - name: subtotal
+        description: "Order subtotal in dollars (before tax). Not re-tested — already covered upstream in stg_orders."
+      - name: tax_paid
+        description: "Tax amount paid in dollars. Not re-tested — already covered upstream in stg_orders."
+      - name: order_total
+        description: "Total order amount in dollars (subtotal + tax)."
+        data_tests:
+          - not_null
+
+  - name: int_order_items_enriched
+    description: >
+      One record per order item, enriched with product details and total supply cost
+      aggregated from stg_supplies. Enables per-item and per-order profitability analysis.
+      Built from stg_order_items, stg_products, and stg_supplies.
+    columns:
+      - name: order_item_id
+        description: "Primary key — unique identifier for each order item."
+        data_tests:
+          - unique
+          - not_null
+      - name: order_id
+        description: "Foreign key to stg_orders. Not re-tested — already covered upstream in stg_order_items."
+      - name: product_id
+        description: "Foreign key to stg_products. Not re-tested — already covered upstream in stg_order_items."
+      - name: product_name
+        description: "Name of the product ordered. Not re-tested — already covered upstream in stg_products."
+      - name: product_type
+        description: "Type of product — jaffle (food) or beverage (drink). Not re-tested — already covered upstream in stg_products."
+      - name: product_price
+        description: "Selling price of the product in dollars."
+        data_tests:
+          - not_null
+      - name: is_food_item
+        description: "True if the product is a jaffle (food item). Not re-tested — already covered upstream in stg_products."
+      - name: is_drink_item
+        description: "True if the product is a beverage (drink item). Not re-tested — already covered upstream in stg_products."
+      - name: supply_cost
+        description: "Total supply cost for this product in dollars (summed across all supplies). Coalesced to 0 if no supply records exist."
+      - name: gross_margin
+        description: "Gross margin per item in dollars (product_price minus supply_cost)."
+        data_tests:
+          - not_null

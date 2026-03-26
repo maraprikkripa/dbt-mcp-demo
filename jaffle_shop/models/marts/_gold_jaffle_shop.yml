@@ -1,0 +1,107 @@
+version: 2
+
+models:
+  - name: dim_customers
+    description: >
+      One record per customer. Aggregates full order history to produce lifetime spend
+      metrics and a Gold/Silver/Bronze segment based on total spend. Built from
+      int_orders_enriched (intermediate layer).
+    columns:
+      - name: customer_id
+        description: Primary key - unique identifier for each customer.
+        data_tests:
+          - unique
+          - not_null
+      - name: customer_name
+        description: Full customer name.
+        data_tests:
+          - not_null
+      - name: total_orders
+        description: Total number of orders placed by this customer.
+        data_tests:
+          - not_null
+      - name: total_spend
+        description: Sum of all order_total values in dollars, rounded to 2 decimal places.
+        data_tests:
+          - not_null
+      - name: avg_order_value
+        description: "Average order_total across all orders, rounded to 2 decimal places."
+        data_tests:
+          - not_null
+      - name: first_order_date
+        description: "Date of the customer's earliest order."
+        data_tests:
+          - not_null
+      - name: last_order_date
+        description: "Date of the customer's most recent order."
+        data_tests:
+          - not_null
+      - name: locations_visited
+        description: "Count of distinct store locations this customer has ordered from."
+        data_tests:
+          - not_null
+      - name: customer_segment
+        description: >
+          Revenue tier: Gold (total_spend >= $100), Silver (>= $50), Bronze (< $50).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Gold', 'Silver', 'Bronze']
+
+  - name: fct_orders
+    description: >
+      One record per order. Combines order financials from int_orders_enriched with
+      item-level counts and profitability from int_order_items_enriched.
+      The gold-layer order fact table with full denormalization for analytics.
+    columns:
+      - name: order_id
+        description: Primary key - unique identifier for each order.
+        data_tests:
+          - unique
+          - not_null
+      - name: order_date
+        description: "Date the order was placed. Not re-tested — not_null covered at int_orders_enriched layer."
+      - name: customer_id
+        description: "Foreign key to dim_customers. stg_orders does not test this FK — tested here as genuine gap."
+        data_tests:
+          - not_null
+      - name: customer_name
+        description: Customer full name (denormalized for analytics convenience).
+      - name: location_id
+        description: Foreign key to stg_locations.
+      - name: location_name
+        description: Store name where the order was placed (denormalized).
+      - name: subtotal
+        description: Order subtotal in dollars before tax.
+      - name: tax_paid
+        description: Tax amount paid in dollars.
+      - name: order_total
+        description: "Total order amount in dollars (subtotal + tax)."
+        data_tests:
+          - not_null
+      - name: count_items
+        description: "Total number of items in the order. COALESCE to 0 — always not_null."
+        data_tests:
+          - not_null
+      - name: count_food_items
+        description: "Number of food (jaffle) items in the order. COALESCE to 0 — always not_null."
+        data_tests:
+          - not_null
+      - name: count_drink_items
+        description: "Number of drink (beverage) items in the order. COALESCE to 0 — always not_null."
+        data_tests:
+          - not_null
+      - name: is_food_order
+        description: "True if the order contains at least one food item. Derived boolean — no test needed."
+      - name: is_drink_order
+        description: "True if the order contains at least one drink item. Derived boolean — no test needed."
+      - name: total_supply_cost
+        description: Total supply cost across all items in the order, in dollars.
+      - name: total_gross_margin
+        description: "Total gross margin across all items (price - supply cost), in dollars."
+        data_tests:
+          - not_null
+      - name: customer_order_number
+        description: "Sequential order number for this customer (1 = first ever order). ROW_NUMBER() always returns a value."
+        data_tests:
+          - not_null

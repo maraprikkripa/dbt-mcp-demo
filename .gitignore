@@ -1,0 +1,14 @@
+# Service account keys — never commit
+keys/
+
+# dbt build artifacts
+target/
+dbt_packages/
+logs/
+run_logs/
+
+# DuckDB local database file
+*.duckdb
+
+# Environment files
+.env

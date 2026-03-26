@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "dbt": {
+      "command": "uvx",
+      "args": ["dbt-mcp"],
+      "env": {
+        "DBT_PROJECT_DIR": "C:/Users/kriparam/Documents/dbt-mcp-demo/jaffle_shop",
+        "DBT_PATH": "C:/Users/kriparam/.local/bin/dbt",
+        "DISABLE_SEMANTIC_LAYER": "true",
+        "DISABLE_DISCOVERY_API": "true"
+      }
+    }
+  }
+}
