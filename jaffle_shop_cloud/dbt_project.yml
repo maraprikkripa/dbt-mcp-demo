@@ -13,6 +13,12 @@ seeds:
   # Builds seeds into '<your_schema_name>_raw'
   jaffle_shop_cloud:
     +schema: raw
+    raw_orders:
+      +column_types:
+        ordered_at: timestamp
+    raw_stores:
+      +column_types:
+        opened_at: timestamp
 
 models:
   jaffle_shop_cloud:
