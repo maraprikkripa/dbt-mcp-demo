@@ -15,7 +15,7 @@ seeds:
     +schema: raw
     raw_orders:
       +column_types:
-        ordered_at: timestamp
+        ORDERED_AT: timestamp
     raw_stores:
       +column_types:
         opened_at: timestamp
