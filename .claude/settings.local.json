@@ -19,7 +19,16 @@
       "Bash(do echo:*)",
       "Bash(__NEW_LINE_ef89e256ac999820__ gh:*)",
       "Bash(python -c \"import sys,json,base64; d=json.load\\(sys.stdin\\); print\\(base64.b64decode\\(d[''''content'''']\\).decode\\(\\)\\)\" echo \"\" done)",
-      "mcp__dbt__build"
+      "mcp__dbt__build",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "Bash(git push:*)",
+      "Bash(git remote:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"Fix BigQuery seed column types for timestamp columns:*)",
+      "Bash(git commit:*)",
+      "WebFetch(domain:www.getdbt.com)"
     ]
   },
   "enableAllProjectMcpServers": true,

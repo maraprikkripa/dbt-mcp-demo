@@ -1,123 +1,163 @@
-# jaffle_shop_bq (BigQuery) — Autonomous Setup Prompt
+# jaffle_shop_bq — Autonomous Build Prompt
 
-Use this prompt in a new Claude Code conversation inside `dbt-mcp-demo/` to build
-the complete jaffle_shop_bq BigQuery project from scratch.
+Use this prompt in a new Claude Code conversation opened inside `dbt-mcp-demo/`
+to build and verify the jaffle_shop_bq BigQuery project end-to-end without any
+manual steps.
 
 ---
 
-## Prerequisites (complete before running this prompt)
-- GCP project `bespin-us-demo` with BigQuery API enabled
-- Service account `dbt-jaffle-shop` with `BigQuery Data Editor` + `BigQuery Job User` roles
-- JSON key saved at: `C:/Users/kriparam/Documents/dbt-mcp-demo/keys/bespin-us-demo-3ab1ffe14924.json`
-- `keys/` in `.gitignore`
+## Context
+
+The project is already fully scaffolded:
+- All models, seeds, macros, and YAML files exist in `jaffle_shop_bq/`
+- `~/.dbt/profiles.yml` has the `jaffle_shop_bq` profile pointing at `bespin-us-demo`
+- Service account key is at `keys/bespin-us-demo-3ab1ffe14924.json`
+- BigQuery datasets are created automatically by dbt-fusion on first run
+
+Do NOT re-scaffold or re-init the project. Start from Step 1 below.
 
 ---
 
 ## Prompt
 
-I want to build the jaffle_shop_bq dbt project targeting BigQuery using dbt-fusion.
-GCP project: `bespin-us-demo`. Dataset: `jaffle_shop_fusion`. Complete all steps below.
+I want to build and verify the jaffle_shop_bq dbt project. It uses dbt-fusion
+targeting BigQuery (project: bespin-us-demo, dataset: jaffle_shop_fusion).
+The project is already scaffolded. Complete all steps below autonomously.
 
-### 1 — Scaffold the project
+---
 
-```bash
-cd /c/Users/kriparam/Documents/dbt-mcp-demo
-dbt init --project-name jaffle_shop_bq --skip-profile-setup
+### Step 1 — Verify connection
+
+Run `dbt debug` from inside `jaffle_shop_bq/`. It must show:
 ```
-
-### 2 — Copy models from the DuckDB project
-
-```bash
-cp -r jaffle_shop/seeds/* jaffle_shop_bq/seeds/
-cp -r jaffle_shop/macros/* jaffle_shop_bq/macros/
-cp -r jaffle_shop/models/* jaffle_shop_bq/models/
-cp jaffle_shop/packages.yml jaffle_shop_bq/
+All checks passed
 ```
+If it fails, check that the keyfile path in `~/.dbt/profiles.yml` is correct and
+the file exists at `keys/bespin-us-demo-3ab1ffe14924.json`.
 
-### 3 — Update jaffle_shop_bq/dbt_project.yml
+---
 
-```yaml
-name: jaffle_shop_bq
-profile: jaffle_shop_bq
-seed-paths: ["seeds"]
-model-paths: ["models"]
-macro-paths: ["macros"]
-seeds:
-  jaffle_shop_bq:
-    +schema: raw
-models:
-  jaffle_shop_bq:
-    +static_analysis: strict
-    staging:
-      +materialized: view
-    intermediate:
-      +materialized: view
-    marts:
-      +materialized: table
-```
-
-### 4 — Add BigQuery profile to ~/.dbt/profiles.yml
-
-```yaml
-jaffle_shop_bq:
-  target: dev
-  outputs:
-    dev:
-      type: bigquery
-      method: service-account
-      project: bespin-us-demo
-      dataset: jaffle_shop_fusion
-      keyfile: "C:/Users/kriparam/Documents/dbt-mcp-demo/keys/bespin-us-demo-3ab1ffe14924.json"
-      threads: 4
-      timeout_seconds: 300
-```
-
-### 5 — Verify connection and build
+### Step 2 — Install packages
 
 ```bash
 cd jaffle_shop_bq
-dbt debug           # must show: All checks passed!
 dbt deps
+```
+
+---
+
+### Step 3 — Build everything
+
+```bash
 dbt build
 ```
 
-Expected: 6 seeds + 14+ models + 41 tests — all pass in BigQuery.
+Expected output:
+- 6 seeds loaded into `jaffle_shop_fusion_raw` dataset in BigQuery
+- 8 view models created (staging + intermediate)
+- 6 table models created (marts)
+- 41+ tests — all pass
+- No errors
 
-### 6 — Demo workflow — show data at each layer
+If any model fails, read the error, fix it, and re-run `dbt build --select <failed_model>+`.
 
-Run layer by layer and show results:
+---
+
+### Step 4 — Demo workflow — show data at each layer
+
+Run each command and show the results so the user can see data flowing through
+the four layers:
+
+**Layer 1 — Raw (seeds)**
+```bash
+dbt show --select raw_orders --limit 5
+```
+What to point out: cents amounts (subtotal, tax_paid, order_total), raw column names
+
+**Layer 2 — Staging**
+```bash
+dbt show --select stg_orders --limit 5
+dbt show --select stg_customers --limit 5
+```
+What to point out: dollars instead of cents, renamed columns (id→order_id, customer→customer_id)
+
+**Layer 3 — Intermediate**
+```bash
+dbt show --select int_orders_enriched --limit 5
+dbt show --select int_order_items_enriched --limit 5
+```
+What to point out: customer_name and location_name joined in, gross_margin computed
+
+**Layer 4 — Gold (marts)**
+```bash
+dbt show --select dim_customers --limit 10
+dbt show --select fct_orders --limit 10
+```
+What to point out: customer_segment (Gold/Silver/Bronze), total_spend, total_gross_margin,
+customer_order_number
+
+---
+
+### Step 5 — Business queries
+
+Run these to show analytics-ready output:
 
 ```bash
-dbt seed
-dbt show --select source:ecom.raw_orders        # raw: cents, messy names
+# Customer segments breakdown
+dbt show --select dim_customers --limit 100
+# (summarise counts per customer_segment in your response)
 
-dbt run --select staging
-dbt show --select stg_orders                    # staging: dollars, renamed
+# Top 10 customers by total spend
+dbt show --select dim_customers --limit 10
+# (sort by total_spend desc in your response)
 
-dbt run --select intermediate
-dbt show --select int_orders_enriched           # intermediate: customer + location joined
-
-dbt run --select marts
-dbt show --select fct_orders                    # gold: item counts, gross margin
-dbt show --select dim_customers                 # gold: lifetime spend, segments
-
-dbt test --select intermediate marts            # expected: 41/41 pass
+# Revenue by location
+dbt show --select fct_orders --limit 100
+# (summarise total order_total per location_name in your response)
 ```
 
-### 7 — Add dbt-bq MCP server entry
+---
 
-In `dbt-mcp-demo/.mcp.json`, add alongside the existing `dbt` entry:
+### Step 6 — Run lineage-aware tests
+
+```bash
+dbt test --select intermediate marts
+```
+
+Expected: 41 tests pass, 0 failures.
+
+---
+
+### Step 7 — Add dbt-bq MCP server to .mcp.json
+
+Read `dbt-mcp-demo/.mcp.json`. Add a second server entry called `dbt-bq` alongside
+the existing `dbt` entry:
 
 ```json
-"dbt-bq": {
-  "type": "stdio",
-  "command": "uvx",
-  "args": ["dbt-mcp"],
-  "env": {
-    "DBT_PROJECT_DIR": "C:/Users/kriparam/Documents/dbt-mcp-demo/jaffle_shop_bq",
-    "DBT_PATH": "C:/Users/kriparam/.local/bin/dbt.exe",
-    "DISABLE_SEMANTIC_LAYER": "true",
-    "DISABLE_DISCOVERY_API": "true"
+{
+  "mcpServers": {
+    "dbt": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["dbt-mcp"],
+      "env": {
+        "DBT_PROJECT_DIR": "C:/Users/kriparam/Documents/dbt-mcp-demo/jaffle_shop",
+        "DBT_PATH": "C:/Users/kriparam/.local/bin/dbt.exe",
+        "DISABLE_SEMANTIC_LAYER": "true",
+        "DISABLE_DISCOVERY_API": "true"
+      }
+    },
+    "dbt-bq": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["dbt-mcp"],
+      "env": {
+        "DBT_PROJECT_DIR": "C:/Users/kriparam/Documents/dbt-mcp-demo/jaffle_shop_bq",
+        "DBT_PATH": "C:/Users/kriparam/.local/bin/dbt.exe",
+        "DISABLE_SEMANTIC_LAYER": "true",
+        "DISABLE_DISCOVERY_API": "true"
+      }
+    }
   }
 }
 ```
@@ -125,8 +165,26 @@ In `dbt-mcp-demo/.mcp.json`, add alongside the existing `dbt` entry:
 ---
 
 ## Success criteria
-- `dbt debug` passes in jaffle_shop_bq/
-- `dbt build` passes — 6 seeds, 14+ models, 41 tests in BigQuery
-- `dim_customers` has rows with `customer_segment` in Gold/Silver/Bronze
-- `fct_orders` has non-null `total_gross_margin` and `customer_order_number`
-- Tables visible in BigQuery Console under `bespin-us-demo.jaffle_shop_fusion`
+
+- [ ] `dbt debug` passes — "All checks passed"
+- [ ] `dbt build` passes — 6 seeds, 14 models, 41+ tests, 0 errors
+- [ ] `dim_customers` has rows with `customer_segment` in Gold / Silver / Bronze
+- [ ] `fct_orders` has non-null `total_gross_margin` and `customer_order_number`
+- [ ] Tables visible in BigQuery Console under `bespin-us-demo.jaffle_shop_fusion`
+- [ ] `.mcp.json` has both `dbt` (DuckDB) and `dbt-bq` (BigQuery) entries
+
+---
+
+## Key facts for debugging
+
+| Thing | Value |
+|---|---|
+| GCP project | `bespin-us-demo` |
+| BQ dataset (models) | `jaffle_shop_fusion` |
+| BQ dataset (seeds) | `jaffle_shop_fusion_raw` |
+| Key file | `keys/bespin-us-demo-3ab1ffe14924.json` |
+| Profile name | `jaffle_shop_bq` |
+| dbt binary | `C:/Users/kriparam/.local/bin/dbt.exe` |
+| Project dir | `C:/Users/kriparam/Documents/dbt-mcp-demo/jaffle_shop_bq` |
+| Amounts in raw seeds | cents — converted to dollars in staging via `cents_to_dollars()` macro |
+| dbt-fusion behaviour | Auto-detects seed column types — no `+column_types` needed (unlike dbt-core) |
